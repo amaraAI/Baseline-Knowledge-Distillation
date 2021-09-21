@@ -107,9 +107,6 @@ netteach.to(device)
 # summary for tensorboard
 writer = SummaryWriter(log_dir='blkd_tb'+'/'+str(args.model)+'/'+str(args.seed)) # here it will create a folder with diff T's
 
-#**********************************************************************************************************************
-# ************ AT THIS STAGE WE ARE GOING TO USE THE SORTED VERSION OF THE TRAINING DATATSEt ***************
-
 # Image Preprocessing
 
 normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
