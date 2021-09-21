@@ -15,3 +15,7 @@ The teacher network is a pre-trained Resnet152 on CIFAR100. The weights can be d
 **3-run:**
 please follow the slurm file attached to this project: *"train_blkd.sh"*
 
+**4-Requirements:**
+torch
+torchvision
+tensorboard
