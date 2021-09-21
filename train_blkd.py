@@ -90,7 +90,8 @@ else:
 
 
 
-#get the network of the teacher R152
+###########################################
+###get the network of the teacher R152 ############
 
 PATH_TEACH= "cifar100_resnet152.pt"
 
@@ -186,8 +187,6 @@ def test(loader,cnn):
 
         with torch.no_grad():
             pred = cnn(images)
-        logits_list.append(pred)
-        labels_list.append(labels)
         pred = torch.max(pred.data, 1)[1]
         total += labels.size(0)
         correct += (pred == labels).sum().item()

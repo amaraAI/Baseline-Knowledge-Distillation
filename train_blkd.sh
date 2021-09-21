@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --gres=gpu:v100:1#
-#SBATCH --account=def-jjclark
-#SBATCH --cpus-per-task=4  # Cores proportional to GPUs: 6 on Cedar, 16 on Graham.
-#SBATCH --mem=64G     # Memory proportional to GPUs: 32000 Cedar, 64000 Graham.
-#SBATCH --time=1:00:00
+#SBATCH --account=def-##### write the account you are using
+#SBATCH --cpus-per-task=4 
+#SBATCH --mem=64G    
+#SBATCH --time=4:00:00
 #SBATCH --output=%x-%j.out
 
 
