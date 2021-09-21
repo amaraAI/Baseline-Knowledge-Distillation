@@ -9,13 +9,13 @@ This projects performs the Baseline Knowledge Distillation (BLKD) from the paper
 */blkd_tb* \
 */jason_logs_blkd* 
 
-**2.Download the pretrained teacher network:**
+**2.Download the pretrained teacher network:**\
 The teacher network is a pre-trained Resnet152 on CIFAR100. The weights can be downloaded here: --link
 
-**3.Run:**
+**3.Run:**\
 please follow the slurm file attached to this project: *"train_blkd.sh"*
 
-**4-Requirements:**
+**4-Requirements:**\
 torch\
 torchvision\
 tensorboard
