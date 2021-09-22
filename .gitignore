@@ -3,4 +3,7 @@
 /blkd_tb
 *.pt
 *.out
+*.err
+*.pyc
+*.log
 /data
