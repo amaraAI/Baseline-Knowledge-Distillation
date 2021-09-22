@@ -6,4 +6,5 @@
 *.err
 *.pyc
 *.log
+*.exp_key
 /data

@@ -1,8 +1,10 @@
+import os
 import argparse
 import numpy as np
-import random 
+import random
 import time
 import warnings
+import comet_ml
 import torchvision
 import torch
 import torch.nn as nn
@@ -10,16 +12,16 @@ from torch.optim.lr_scheduler import MultiStepLR
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 from util.misc import CSVLogger
-from model.resnet import ResNet18,ResNet34,ResNet50, ResNet101 , ResNet152
+from model.resnet import ResNet18,ResNet34, ResNet50, ResNet101, ResNet152
 from torch.utils.tensorboard import SummaryWriter
-        
+
 model_options = ['resnet18','resnet34','resnet50','resnet101','resnet152', 'wideresnet','mobilenetv2','resnet8']
 dataset_options = ['cifar100']
 
 def set_seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
-    random.seed(seed) 
+    random.seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
@@ -35,14 +37,14 @@ parser.add_argument('--model', '-a', default='resnet18',
                     choices=model_options)
 parser.add_argument('--batch_size', type=int, default=128,
                     help='input batch size for training (default: 128)')
-parser.add_argument('--epochs', type=int, default=300,
-                    help='number of epochs to train (default: 20)')
+parser.add_argument('--epochs', type=int, default=200,
+                    help='number of epochs to train (default: 200)')
 parser.add_argument('--learning_rate', type=float, default=0.1,
                     help='learning rate')
 parser.add_argument('--data_augmentation', action='store_true', default=True,
                     help='augment data by flipping and cropping')
 parser.add_argument('--seed', type=int, default=0,
-                    help='random seed (default: 1)')
+                    help='random seed (default: 0)')
 #parameters related to KD
 parser.add_argument('--alphakd', type=float, default=0.7, help='alpha kd parameter')
 parser.add_argument('--T', type= int , default=10, help='temperature for kd')
@@ -57,15 +59,16 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 warnings.filterwarnings("ignore")
 
 #this line is to create a name for each savefile
-test_id =  args.name + args.model
+test_id =  f'{args.name}_{args.model}_sd{args.seed}_bsz{args.batch_size}_lr{args.learning_rate}'
 
 #print the namespace.
 print(args)
 #set the seeds
 set_seed(args.seed)
 
-#verify if we need to resume... 
-if args.resume: 
+
+#verify if we need to resume...
+if args.resume:
     ''' load the model '''
     checkpoint_path = 'blkd_checkpoints/' + test_id + '.pt'
     checkpoint = torch.load(checkpoint_path, map_location=device)
@@ -83,12 +86,30 @@ if args.resume:
     torch.random.set_rng_state(checkpoint['torch_random_rng_state'].cpu())
     random.setstate(checkpoint['random_rng_state'])
     np.random.set_state(checkpoint['np_random_rng_state'])
-else: 
+
+    with open(os.path.join('comet_keys', f"comet_{test_id}.exp_key"), "r") as f:
+        prev_exp_key = f.readline().strip()
+    experiment = comet_ml.ExistingExperiment(previous_experiment=prev_exp_key,
+                                                          auto_metric_logging=False,
+                                                          log_env_details=True,
+                                                          log_env_host=True,
+                                                          log_code=False)
+else:
     start_epoch = 0
     best_acc = 0.0
     best_epoch = 0
 
-
+    experiment = comet_ml.Experiment(project_name='blkd',
+                                                  workspace='anjunhu',
+                                                  auto_metric_logging=False,
+                                                  log_env_details=True,
+                                                  log_env_host=True,
+                                                  log_code=True)
+    experiment.set_name(test_id)
+    for key, value in vars(argparse.Namespace()):
+        experiment.log_parameter(key, value)
+    with open(os.path.join('comet_keys', f"comet_{test_id}.exp_key"), "w") as f:
+        f.write(experiment.get_key())
 
 ###########################################
 ###get the network of the teacher R152 ############
@@ -153,12 +174,22 @@ val_loader = torch.utils.data.DataLoader(dataset=testset,
 
 if args.model == 'resnet18':
     cnn = ResNet18(num_classes=num_classes)
+elif args.model == 'resnet34':
+    cnn = ResNet34(num_classes=num_classes)
+elif args.model == 'resnet50':
+    cnn = ResNet50(num_classes=num_classes)
+elif args.model == 'resnet101':
+    cnn = ResNet101(num_classes=num_classes)
+elif args.model == 'resnet152':
+    cnn = ResNet152(num_classes=num_classes)
 elif args.model == 'wideresnet':
-    cnn = WideResNet(depth=28, num_classes=num_classes, widen_factor=10,dropRate=0.3)
+    from model.wide_resnet import WideResNet
+    cnn = WideResNet(depth=28, num_classes=num_classes, widen_factor=8, dropRate=0.3)
 elif args.model == 'mobilenetv2':
     from model.mobilenetv2 import mobilenetv2
     cnn = mobilenetv2()
 
+experiment.set_model_graph(cnn)
 cnn = cnn.to(device)
 criterion = nn.CrossEntropyLoss().to(device)
 cnn_optimizer = torch.optim.SGD(cnn.parameters(), lr=args.learning_rate,
@@ -236,7 +267,10 @@ for epoch in range(start_epoch, args.epochs):
     
     writer.add_scalar('Train/Accuracy',train_acc,epoch)
     writer.add_scalar('Train/Loss',avg_loss,epoch)
-
+ 
+    with experiment.train():
+        experiment.log_metric('loss', avg_loss, epoch=epoch)
+        experiment.log_metric('acc',train_acc, epoch=epoch)
 
     val_acc = test(val_loader,cnn)
     
@@ -274,6 +308,9 @@ for epoch in range(start_epoch, args.epochs):
 
     row = {'epoch': str(epoch), 'train_acc': str(train_acc), 'val_acc' : str(val_acc)}
     csv_logger.writerow(row)
+    with experiment.validate():
+        #experiment.log_metric('loss', loss, epoch=epoch)
+        experiment.log_metric('acc', val_acc, epoch=epoch)
 
 writer.close()
 csv_logger.close()

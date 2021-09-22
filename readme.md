@@ -18,4 +18,5 @@ please follow the slurm file attached to this project: *"train_blkd.sh"*\
 **4-Requirements:**\
 torch\
 torchvision\
-tensorboard
+tensorboard\
+comet_ml
