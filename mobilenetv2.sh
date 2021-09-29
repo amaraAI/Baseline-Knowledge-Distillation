@@ -23,11 +23,11 @@
 source ../environments/blkd/bin/activate
 
 python3 -W ignore train_blkd.py \
---learning_rate 0.1 \
+--learning_rate 0.01 \
 --batch_size 40 \
 --name BLKD \
---model wideresnet \
---epochs 80 \
+--model mobilenetv2 \
+--epochs 300 \
 --seed 1 \
 --T 10 \
 --alphakd 0.7 \

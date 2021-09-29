@@ -1,0 +1,17 @@
+model,efficientnet
+batch_size,200
+epochs,300
+learning_rate,0.1
+data_augmentation,True
+seed,1
+alphakd,0.7
+T,10
+name,BLKD
+resume,False
+""
+epoch,train_acc,val_acc
+0,0.0223,0.033
+1,0.05206,0.0503
+2,0.07968,0.0699
+3,0.10226,0.0956
+4,0.1231,0.114

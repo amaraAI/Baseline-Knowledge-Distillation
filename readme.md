@@ -19,4 +19,5 @@ please follow the slurm file attached to this project: *"train_blkd.sh"*\
 torch\
 torchvision\
 tensorboard\
+geffnet\
 comet_ml

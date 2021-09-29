@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --gres=gpu:p100:1#
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
 #SBATCH --time=12:00:00
 
@@ -24,11 +24,11 @@ source ../environments/blkd/bin/activate
 
 python3 -W ignore train_blkd.py \
 --learning_rate 0.1 \
---batch_size 40 \
+--batch_size 80 \
 --name BLKD \
---model wideresnet \
---epochs 80 \
+--model efficientnet \
+--epochs 300 \
 --seed 1 \
 --T 10 \
 --alphakd 0.7 \
---data_augmentation
+--data_augmentation \

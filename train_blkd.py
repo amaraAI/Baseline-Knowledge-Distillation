@@ -12,10 +12,12 @@ from torch.optim.lr_scheduler import MultiStepLR
 import torch.nn.functional as F
 from torchvision import datasets, transforms
 from util.misc import CSVLogger
-from model.resnet import ResNet18,ResNet34, ResNet50, ResNet101, ResNet152
+from model.resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152
 from torch.utils.tensorboard import SummaryWriter
+import geffnet
 
-model_options = ['resnet18','resnet34','resnet50','resnet101','resnet152', 'wideresnet','mobilenetv2','resnet8']
+model_options = ['resnet18','resnet34','resnet50','resnet101','resnet152',
+                 'wideresnet','mobilenetv2','resnet8','efficientnet', 'ghostnet']
 dataset_options = ['cifar100']
 
 def set_seed(seed):
@@ -67,6 +69,63 @@ print(args)
 set_seed(args.seed)
 
 
+num_classes = 100
+
+# Image Preprocessing
+normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
+                                     std=[x / 255.0 for x in [63.0, 62.1, 66.7]])
+train_transform = transforms.Compose([])
+if args.data_augmentation:
+#    train_transform.transforms.append(transforms.RandomRotation(4))
+#    train_transform.transforms.append(transforms.RandomAffine(4, (4, 4), (0.8, 1.25), 4))
+    train_transform.transforms.append(transforms.RandomCrop(32, padding=4))
+    train_transform.transforms.append(transforms.RandomHorizontalFlip())
+train_transform.transforms.append(transforms.ToTensor())
+train_transform.transforms.append(normalize)
+
+test_transform = transforms.Compose([
+    transforms.ToTensor(),
+    normalize])
+
+trainset= datasets.CIFAR100(root='data/',
+                                      train=True,
+                                      transform=train_transform,
+                                      download=True)
+
+testset = datasets.CIFAR100(root='data/',
+                                train=False,
+                                transform=test_transform,
+                                download=True)
+
+if args.model == 'resnet18':
+    cnn = ResNet18(num_classes=num_classes)
+elif args.model == 'resnet34':
+    cnn = ResNet34(num_classes=num_classes)
+elif args.model == 'resnet50':
+    cnn = ResNet50(num_classes=num_classes)
+elif args.model == 'resnet101':
+    cnn = ResNet101(num_classes=num_classes)
+elif args.model == 'resnet152':
+    cnn = ResNet152(num_classes=num_classes)
+elif args.model == 'wideresnet':
+    from model.wide_resnet import WideResNet
+    cnn = WideResNet(depth=28, num_classes=num_classes, widen_factor=8, dropRate=0.3)
+elif args.model == 'mobilenetv2':
+    from model.mobilenetv2 import mobilenetv2
+    cnn = mobilenetv2()
+elif args.model == 'efficientnet':
+    cnn = geffnet.efficientnet_b2(num_classes=num_classes)
+elif args.model == 'ghostnet':
+    from model.ghostnet import ghost_net
+    cnn = ghost_net(num_classes=num_classes)
+
+cnn_optimizer = torch.optim.SGD(cnn.parameters(), lr=args.learning_rate,
+                                momentum=0.9, nesterov=True, weight_decay=5e-4)
+
+scheduler = MultiStepLR(cnn_optimizer, milestones=[50, 100, 150], gamma=0.2)
+#below is the one using CRD
+#scheduler = MultiStepLR(cnn_optimizer, milestones=[150, 180, 210], gamma=0.1)
+
 #verify if we need to resume...
 if args.resume:
     ''' load the model '''
@@ -81,9 +140,10 @@ if args.resume:
 
     ''' load the seeds states '''
     checkpoint_path = 'blkd_checkpoints_seeds/' + test_id + '.pt'
-    checkpoint = torch.load(checkpoint_path, map_location=device) 
-    torch.cuda.set_rng_state(checkpoint['cuda_rng_state'].cpu())
-    torch.random.set_rng_state(checkpoint['torch_random_rng_state'].cpu())
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    print(type(checkpoint['cuda_rng_state']), type(checkpoint['torch_random_rng_state']))
+    torch.cuda.set_rng_state(checkpoint['cuda_rng_state'].byte().to(device))
+    torch.random.set_rng_state(checkpoint['torch_random_rng_state'].byte().to(device))
     random.setstate(checkpoint['random_rng_state'])
     np.random.set_state(checkpoint['np_random_rng_state'])
 
@@ -128,33 +188,6 @@ netteach.to(device)
 # summary for tensorboard
 writer = SummaryWriter(log_dir='blkd_tb'+'/'+str(args.model)+'/'+str(args.seed)) # here it will create a folder with diff T's
 
-# Image Preprocessing
-
-normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
-                                     std=[x / 255.0 for x in [63.0, 62.1, 66.7]])
-train_transform = transforms.Compose([])
-if args.data_augmentation:
-    train_transform.transforms.append(transforms.RandomCrop(32, padding=4))
-    train_transform.transforms.append(transforms.RandomHorizontalFlip())
-train_transform.transforms.append(transforms.ToTensor())
-train_transform.transforms.append(normalize)
-
-test_transform = transforms.Compose([
-    transforms.ToTensor(),
-    normalize])
-
-num_classes = 100
-    
-trainset= datasets.CIFAR100(root='data/',
-                                      train=True,
-                                      transform=train_transform,
-                                      download=True)
-
-testset = datasets.CIFAR100(root='data/',
-                                train=False,
-                                transform=test_transform,
-                                download=True)
-
 # create the generators for each dataloader to seed
 g = torch.Generator()
 g.manual_seed(args.seed)
@@ -172,33 +205,9 @@ val_loader = torch.utils.data.DataLoader(dataset=testset,
                                            num_workers=4,
                                            worker_init_fn=seed_worker,generator=gv)
 
-if args.model == 'resnet18':
-    cnn = ResNet18(num_classes=num_classes)
-elif args.model == 'resnet34':
-    cnn = ResNet34(num_classes=num_classes)
-elif args.model == 'resnet50':
-    cnn = ResNet50(num_classes=num_classes)
-elif args.model == 'resnet101':
-    cnn = ResNet101(num_classes=num_classes)
-elif args.model == 'resnet152':
-    cnn = ResNet152(num_classes=num_classes)
-elif args.model == 'wideresnet':
-    from model.wide_resnet import WideResNet
-    cnn = WideResNet(depth=28, num_classes=num_classes, widen_factor=8, dropRate=0.3)
-elif args.model == 'mobilenetv2':
-    from model.mobilenetv2 import mobilenetv2
-    cnn = mobilenetv2()
-
+criterion = nn.CrossEntropyLoss().to(device)
 experiment.set_model_graph(cnn)
 cnn = cnn.to(device)
-criterion = nn.CrossEntropyLoss().to(device)
-cnn_optimizer = torch.optim.SGD(cnn.parameters(), lr=args.learning_rate,
-                                momentum=0.9, nesterov=True, weight_decay=5e-4)
-
-
-scheduler = MultiStepLR(cnn_optimizer, milestones=[50, 100, 150], gamma=0.2)
-#below is the one using CRD 
-#scheduler = MultiStepLR(cnn_optimizer, milestones=[150, 180, 210], gamma=0.1)
 
 filename = 'jason_logs_blkd/' + test_id + '.csv'
 csv_logger = CSVLogger(args=args, fieldnames=['epoch', 'train_acc', 'val_acc'], filename=filename)
@@ -298,9 +307,9 @@ for epoch in range(start_epoch, args.epochs):
             }
     torch.save(state_of_model,'blkd_checkpoints/' + test_id + '.pt')
 
-    state_of_seeds = { 
-            'torch_random_rng_state': torch.random.get_rng_state().cuda(),
-            'cuda_rng_state': torch.cuda.get_rng_state().cuda(),
+    state_of_seeds = {
+            'torch_random_rng_state': torch.random.get_rng_state(),
+            'cuda_rng_state': torch.cuda.get_rng_state(),
             'random_rng_state': random.getstate(),
             'np_random_rng_state': np.random.get_state(),
             }

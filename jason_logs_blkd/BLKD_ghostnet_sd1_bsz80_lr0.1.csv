@@ -1,12 +1,13 @@
-model,resnet152
+model,ghostnet
 batch_size,80
-epochs,200
+epochs,300
 learning_rate,0.1
 data_augmentation,True
-seed,0
+seed,1
 alphakd,0.7
 T,10
 name,BLKD
-resume,True
+resume,False
 ""
 epoch,train_acc,val_acc
+0,0.08076,0.1364
